@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HF City</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* MC 经典配色 */
+            --mc-green-top: #74c354; /* 草皮顶部亮绿 */
+            --mc-green-side: #588e40; /* 草皮侧边深绿 */
+            --mc-dirt: #8b5e3c; /* 泥土褐色 */
+            --mc-bg-dark: #121212;
+            --cube-size: 100px; /* 定义方块大小变量，方便修改 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* 禁止滚动 */
+            background-color: var(--mc-bg-dark);
+            /* 深色星空背景 */
+            background-image: radial-gradient(circle at center, #2a2a2a 0%, #050505 100%);
+            font-family: 'Press Start 2P', cursive, monospace;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* 开启 3D 视角 */
+            perspective: 1000px;
+        }
+
+        /* 背景噪点增加质感 */
+        .noise {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 85vh;
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* --- 顶部：服务器名称 (保持原样) --- */
+        .header {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 5vw, 3.5rem);
+            text-shadow: 5px 5px 0px #000;
+            line-height: 1.4;
+            color: #fca311;
+            margin-bottom: 15px;
+            padding: 0 10px;
+        }
+
+        .subtitle {
+            font-size: clamp(0.7rem, 2vw, 1.2rem);
+            color: #aaaaaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* --- 中间：3D 草方块动画 (重构核心) --- */
+        .scene {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 2;
+            /* 确保子元素的 3D 变换得以保留 */
+            transform-style: preserve-3d;
+        }
+
+        /* 方块的容器，负责整体的旋转和悬浮动画 */
+        .minecraft-cube {
+            width: var(--cube-size);
+            height: var(--cube-size);
+            position: relative;
+            transform-style: preserve-3d; /* 关键：保留 3D 空间 */
+            /* 复合动画：一边旋转一边上下浮动 */
+            animation: spinCube 12s infinite linear, floatCube 3s ease-in-out infinite alternate;
+        }
+
+        /* 方块的六个面通用样式 */
+        .face {
+            position: absolute;
+            width: var(--cube-size);
+            height: var(--cube-size);
+            /* 简单的内阴影模拟像素边框感 */
+            box-shadow: inset 0 0 0 4px rgba(0,0,0,0.15);
+            /* 确保纹理清晰 */
+            image-rendering: pixelated; 
+            background-color: var(--mc-dirt); /* 默认底色 */
+        }
+
+        /* --- 定义六个面的位置和纹理 --- */
+        
+        /* 顶面：纯草色 */
+        .top {
+            background-color: var(--mc-green-top);
+            /* 绕X轴旋转90度，再向上平移 */
+            transform: rotateX(90deg) translateZ(calc(var(--cube-size) / 2));
+        }
+        
+        /* 底面：纯泥土色 */
+        .bottom {
+            background-color: var(--mc-dirt);
+            /* 绕X轴反向旋转90度，再向下平移 */
+            transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2));
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5); /* 底部暗一点 */
+        }
+
+        /* 侧面通用纹理：上绿下棕的渐变 */
+        .side {
+            background: linear-gradient(to bottom, 
+                var(--mc-green-side) 0%, 
+                var(--mc-green-side) 20%, /* 顶部 20% 是绿色草皮侧边 */
+                var(--mc-dirt) 20%, 
+                var(--mc-dirt) 100% /* 剩下是泥土 */
+            );
+        }
+
+        /* 前面 */
+        .front { transform: translateZ(calc(var(--cube-size) / 2)); }
+        /* 后面 */
+        .back { transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2)); }
+        /* 左面 */
+        .left { transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2)); }
+        /* 右面 */
+        .right { transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2)); }
+
+
+        /* --- 底部：静态文字 (保持原样) --- */
+        .footer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .status-box {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: 2px solid #555;
+            padding: 15px 30px;
+            box-shadow: inset 2px 2px 0 rgba(255,255,255,0.1),
+                        inset -2px -2px 0 rgba(0,0,0,0.5); 
+            text-align: center;
+        }
+
+        .status-text {
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            color: #dcdcdc;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: var(--mc-green-top);
+            font-weight: bold;
+            display: block;
+            margin-top: 5px;
+            font-size: 1.2em;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* --- 动画关键帧定义 --- */
+
+        /* 3D 旋转动画 */
+        @keyframes spinCube {
+            from { transform: rotateX(-15deg) rotateY(0deg); }
+            to   { transform: rotateX(-15deg) rotateY(360deg); }
+        }
+
+        /* 上下悬浮动画 */
+        @keyframes floatCube {
+            from { margin-top: -15px; }
+            to   { margin-top: 15px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="noise"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>HF City</h1>
+            <div class="subtitle">一个基岩版纯生存服务器</div>
+        </div>
+
+        <div class="scene">
+            <div class="minecraft-cube">
+                <div class="face top"></div>
+                <div class="face bottom"></div>
+                <div class="face side front"></div>
+                <div class="face side back"></div>
+                <div class="face side left"></div>
+                <div class="face side right"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="status-box">
+                <div class="status-text">
+                    也算是老服务器了，正在加速复活中
+                    <span class="highlight">🚧 施工进行中 🚧</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
